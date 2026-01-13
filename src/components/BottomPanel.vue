@@ -74,9 +74,9 @@ defineProps<{
 defineEmits(['item-click']);
 
 const tabs = [
-  { id: 'schedule', label: '📅 일정' },
-  { id: 'check', label: '✅ 준비' },
-  { id: 'info', label: 'ℹ️ 정보' },
+  { id: 'schedule', label: '일정' },
+  { id: 'check', label: '준비' },
+  { id: 'info', label: '정보' },
 ];
 
 const currentTab = ref('schedule');

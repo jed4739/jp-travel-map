@@ -13,6 +13,5 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 
-// ⚠️ 여기 export가 필수입니다!
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
