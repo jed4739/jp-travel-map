@@ -172,7 +172,7 @@ defineExpose({ flyToLocation });
 .popup-overlay {
   position: absolute;
   background: white;
-  padding: 10px 15px;
+  padding: 18px 18px;
   border-radius: 8px;
   box-shadow: 0 4px 15px rgba(0,0,0,0.3);
 
@@ -207,8 +207,8 @@ defineExpose({ flyToLocation });
 
   .popup-close {
     position: absolute;
-    top: -12px;
-    right: -12px;
+    top: -20px;
+    right: -20px;
     background: none;
     border: none;
     color: #bbb;

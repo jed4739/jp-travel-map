@@ -28,35 +28,56 @@
         <div v-if="loading" class="loading">로딩 중...</div>
         <div v-else-if="items.length === 0" class="empty">일정이 없습니다.</div>
 
-        <div
-            v-else
-            v-for="(item, index) in items"
-            :key="index"
-            class="schedule-item"
-            @click="$emit('item-click', item)"
-        >
-          <div class="time-col">
-            <span class="date">{{ item.date }}</span>
-            <span class="time">{{ formatTime(item.timeRange) }}</span>
+        <template v-for="(item, index) in items" :key="index">
+
+          <div v-if="isNewDay(index)" class="date-header">
+            <span class="day-badge">{{ getDay(item.date) }}</span>
+            <span class="date-text">{{ item.date }}</span>
           </div>
-          <div class="info-col">
-            <div class="category-tag" :class="item.category.toLowerCase()">
-              {{ item.category }}
+
+          <div
+              class="schedule-item-wrapper"
+              :class="{ 'is-alternative': isAlternative(item) }"
+              @click="$emit('item-click', item)"
+          >
+            <div class="time-col">
+              <div v-if="!isSameTimeAsPrev(index)" class="time-group">
+                <span class="start-time">{{ getStartTime(item.timeRange) }}</span>
+                <span class="end-time">{{ getEndTime(item.timeRange) }}</span>
+              </div>
+              <div v-else class="time-connector">↳</div>
             </div>
-            <div class="title">{{ item.content }}</div>
-            <div v-if="item.note" class="note">⚠️ {{ item.note }}</div>
+
+            <div class="timeline-col">
+              <div class="line"></div>
+              <div class="dot" :class="item.category.toLowerCase()"></div>
+            </div>
+
+            <div class="info-card">
+              <div class="card-header">
+                <span class="category-pill" :class="item.category.toLowerCase()">
+                  {{ item.category }}
+                </span>
+                <span v-if="isAlternative(item)" class="alt-badge">Plan B</span>
+              </div>
+
+              <div class="title">{{ item.content }}</div>
+
+              <div v-if="item.note" class="note-box">
+                <span class="note-icon">⚠️</span>
+                <span class="note-text">{{ item.note }}</span>
+              </div>
+            </div>
           </div>
-        </div>
+        </template>
       </div>
 
       <div v-if="currentTab === 'check'" class="check-tab">
-        <h3>✅ 준비물 체크리스트</h3>
-        <p>여권, 지갑, 돼지코 변압기...</p>
+        <h3>준비물 체크리스트</h3>
       </div>
 
       <div v-if="currentTab === 'info'" class="info-tab">
-        <h3>ℹ️ 정보</h3>
-        <p>숙소 정보 등...</p>
+        <h3>정보</h3>
       </div>
     </div>
   </div>
@@ -66,7 +87,7 @@
 import { ref } from 'vue';
 import type { ScheduleItem } from '../composables/useSchedule';
 
-defineProps<{
+const props = defineProps<{
   items: ScheduleItem[];
   loading: boolean;
 }>();
@@ -80,84 +101,98 @@ const tabs = [
 ];
 
 const currentTab = ref('schedule');
-const panelHeight = ref(45); // 초기 높이 (45%)
+const panelHeight = ref(45);
 const isDragging = ref(false);
 let startY = 0;
 let startHeight = 0;
 
-// 탭 변경 시 패널이 너무 작으면 살짝 올려줌
+// 날짜가 바뀌는지 확인 (헤더용)
+const isNewDay = (index: number) => {
+  if (index === 0) return true;
+  return props.items[index].date !== props.items[index - 1].date;
+};
+
+// 시간 중복 확인 (대안 일정 묶기용)
+const isSameTimeAsPrev = (index: number) => {
+  if (index === 0) return false;
+  if (isNewDay(index)) return false; // 날짜가 바뀌면 시간 같아도 분리
+  const prev = props.items[index - 1];
+  const curr = props.items[index];
+  return prev.timeRange === curr.timeRange;
+};
+
+const isAlternative = (item: ScheduleItem) => {
+  return item.content.includes('(대안)') || item.content.includes('선택');
+};
+
+// 날짜에서 요일만 추출 (예: '2.04 (수)' -> '수')
+const getDay = (dateStr: string) => {
+  const match = dateStr.match(/\((.*?)\)/);
+  return match ? match[1] : '';
+};
+
+const getStartTime = (range: string) => {
+  if (!range) return '';
+  // 줄바꿈이나 물결표 기준으로 앞부분만 자름
+  return range.split(/~|\n/)[0].trim();
+};
+
+const getEndTime = (range: string) => {
+  if (!range || !range.includes('~')) return '';
+  // 뒷부분 자름
+  return range.split('~')[1].trim();
+};
+
+// ... 드래그 관련 함수들 (기존과 동일) ...
 const changeTab = (tabId: string) => {
   currentTab.value = tabId;
-  if (panelHeight.value < 20) {
-    panelHeight.value = 45;
-  }
+  if (panelHeight.value < 20) panelHeight.value = 45;
 };
 
-// 🖐 드래그 시작
 const startDrag = (e: TouchEvent) => {
   isDragging.value = true;
-  startY = e.touches[0].clientY; // 터치한 Y 좌표
-  startHeight = panelHeight.value; // 현재 높이 (%)
+  startY = e.touches[0].clientY;
+  startHeight = panelHeight.value;
 };
 
-// 🖐 드래그 중 (실시간 높이 계산)
 const onDrag = (e: TouchEvent) => {
   if (!isDragging.value) return;
-
   const currentY = e.touches[0].clientY;
-  const deltaY = currentY - startY; // 이동한 거리 (px)
+  const deltaY = currentY - startY;
   const windowHeight = window.innerHeight;
-
-  // 픽셀을 퍼센트로 변환 (위로 올리면 deltaY가 마이너스이므로 빼줘야 높이가 늘어남)
   const deltaPercent = (deltaY / windowHeight) * 100;
 
   let newHeight = startHeight - deltaPercent;
-
-  // 높이 제한 (최소 10% ~ 최대 95%)
   if (newHeight < 10) newHeight = 10;
   if (newHeight > 95) newHeight = 95;
-
   panelHeight.value = newHeight;
 };
 
-// 🖐 손 뗐을 때 (스냅 효과)
 const endDrag = () => {
   isDragging.value = false;
   const h = panelHeight.value;
-
-  // 가까운 위치로 자석처럼 붙기
-  if (h < 25) {
-    panelHeight.value = 15; // 최소 (탭만 보임)
-  } else if (h < 65) {
-    panelHeight.value = 45; // 중간 (지도+리스트 반반)
-  } else {
-    panelHeight.value = 90; // 최대 (리스트 꽉 채움)
-  }
-};
-
-const formatTime = (raw: string) => {
-  if (!raw) return '';
-  return raw.split('\n')[0].replace('~', '').trim();
+  if (h < 25) panelHeight.value = 15;
+  else if (h < 65) panelHeight.value = 45;
+  else panelHeight.value = 90;
 };
 </script>
 
 <style scoped lang="scss">
+/* 기본 패널 스타일 */
 .bottom-panel {
   position: absolute;
   bottom: 0;
   left: 0;
   width: 100%;
-  /* height는 style 바인딩으로 제어 */
+  z-index: 9999;
   background: white;
   border-top-left-radius: 20px;
   border-top-right-radius: 20px;
   box-shadow: 0 -4px 20px rgba(0,0,0,0.15);
   display: flex;
   flex-direction: column;
-  z-index: 1000;
   overflow: hidden;
 
-  /* 데스크탑 대응 */
   @media (min-width: 768px) {
     width: 400px;
     left: 20px;
@@ -167,24 +202,18 @@ const formatTime = (raw: string) => {
 }
 
 .panel-handle-area {
-  padding: 15px 0; /* 터치 영역 넉넉하게 */
+  padding: 12px 0;
   display: flex;
   justify-content: center;
   cursor: grab;
-  background: #fff;
-  flex-shrink: 0; /* 크기 줄어들지 않게 고정 */
-  touch-action: none; /* 브라우저 기본 스크롤 막기 (드래그 전용) */
+  background: white;
+  flex-shrink: 0;
 
   .panel-handle {
     width: 40px;
-    height: 5px;
+    height: 4px;
     background: #e0e0e0;
     border-radius: 10px;
-  }
-
-  &:active {
-    cursor: grabbing;
-    background: #f5f5f5; /* 누르면 색 살짝 변하게 */
   }
 }
 
@@ -192,72 +221,216 @@ const formatTime = (raw: string) => {
   display: flex;
   border-bottom: 1px solid #eee;
   flex-shrink: 0;
-  background: white;
 
   button {
     flex: 1;
-    padding: 15px 0;
+    padding: 12px 0;
     border: none;
-    background: none;
-    font-weight: bold;
-    color: #888;
+    background: white;
+    font-weight: 600;
+    font-size: 18px;
+    color: #999;
     cursor: pointer;
-    font-size: 1rem;
 
     &.active {
-      color: #2979FF;
-      border-bottom: 2px solid #2979FF;
+      color: #333;
+      border-bottom: 2px solid #333;
     }
   }
 }
 
 .panel-content {
   flex: 1;
-  overflow-y: auto; /* 내용 많으면 내부 스크롤 */
-  padding: 0 20px 20px 20px;
-  background: #f9f9f9;
+  overflow-y: auto;
+  padding-left: 20px;
+  padding-right: 20px;
+  background: #f8f9fa; /* 배경을 아주 연한 회색으로 */
 }
 
-/* 리스트 아이템 스타일 (이전과 동일) */
-.schedule-item {
-  background: white;
-  padding: 15px;
-  margin-top: 15px; /* 간격 조정 */
-  border-radius: 12px;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-  display: flex;
-  gap: 15px;
-  cursor: pointer;
+/* 📅 타임라인 스타일 시작 */
 
-  .time-col {
+.date-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: rgba(248, 249, 250, 0.95); /* 반투명 배경 */
+  padding: 15px 0 10px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid #eee;
+
+  .day-badge {
+    background: #333;
+    color: white;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+    font-weight: bold;
+  }
+  .date-text {
+    font-weight: 800;
+    font-size: 1.1rem;
+    color: #222;
+  }
+}
+
+.schedule-item-wrapper {
+  display: flex; /* 가로 정렬 핵심 */
+  gap: 12px;
+  margin-bottom: 15px; /* 아이템 간 간격 */
+  position: relative;
+
+  /* 대안 일정 스타일 */
+  &.is-alternative {
+    opacity: 0.85;
+    .info-card {
+      background: #f1f3f5;
+      border: 1px dashed #ccc;
+      box-shadow: none;
+    }
+  }
+}
+
+/* 1. 왼쪽 시간 컬럼 */
+.time-col {
+  width: 50px;
+  flex-shrink: 0;
+  text-align: right;
+  padding-top: 5px;
+
+  .time-group {
     display: flex;
     flex-direction: column;
-    align-items: center;
-    min-width: 50px;
-    border-right: 1px solid #eee;
-    padding-right: 15px;
-    .date { font-size: 0.8rem; color: #888; }
-    .time { font-weight: bold; font-size: 1.1rem; color: #333; }
+  }
+  .start-time {
+    font-weight: 700;
+    font-size: 1rem;
+    color: #333;
+  }
+  .end-time {
+    font-size: 0.75rem;
+    color: #999;
+    margin-top: 2px;
+  }
+  .time-connector {
+    font-size: 1.5rem;
+    color: #ccc;
+    padding-right: 10px;
+  }
+}
+
+/* 2. 중앙 타임라인 컬럼 */
+.timeline-col {
+  width: 16px;
+  flex-shrink: 0;
+  position: relative;
+  display: flex;
+  justify-content: center;
+
+  /* 세로 선 */
+  .line {
+    position: absolute;
+    top: 5px;
+    bottom: -20px; /* 다음 아이템까지 이어지게 */
+    width: 2px;
+    background: #e9ecef;
   }
 
-  .info-col {
-    .category-tag {
-      font-size: 0.7rem;
-      padding: 2px 6px;
-      border-radius: 4px;
-      background: #eee;
-      display: inline-block;
-      margin-bottom: 5px;
-      font-weight: bold;
+  /* 동그라미 점 */
+  .dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #ccc;
+    z-index: 1; /* 선보다 위에 */
+    margin-top: 8px; /* 시간 텍스트와 높이 맞춤 */
+    border: 2px solid white;
+    box-shadow: 0 0 0 1px rgba(0,0,0,0.1);
 
-      &.sight { background: #E3F2FD; color: #1565C0; }
-      &.food { background: #E0F2F1; color: #00695C; }
-      &.home { background: #F3E5F5; color: #7B1FA2; }
-      &.shop { background: #FCE4EC; color: #C2185B; }
-      &.airport { background: #ECEFF1; color: #455A64; }
+    &.sight { background: #2962FF; }
+    &.food { background: #00BFA5; }
+    &.home { background: #6200EA; }
+    &.shop { background: #C51162; }
+    &.airport { background: #37474F; }
+    &.cafe { background: #795548; }
+  }
+}
+
+/* 3. 오른쪽 정보 카드 */
+.info-card {
+  flex: 1;
+  background: white;
+  padding: 12px 15px;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  cursor: pointer;
+  transition: transform 0.1s;
+
+  &:active {
+    transform: scale(0.98);
+  }
+
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+  }
+
+  .category-pill {
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 12px;
+    background: #eee;
+    color: #555;
+
+    &.sight { background: #E3F2FD; color: #1565C0; }
+    &.food { background: #E0F2F1; color: #00695C; }
+    &.home { background: #F3E5F5; color: #7B1FA2; }
+    &.shop { background: #FCE4EC; color: #C2185B; }
+    &.airport { background: #ECEFF1; color: #455A64; }
+    &.cafe { background: #EFEBE9; color: #5D4037; }
+  }
+
+  .alt-badge {
+    font-size: 0.65rem;
+    background: #aaa;
+    color: white;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: bold;
+  }
+
+  .title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #333;
+    line-height: 1.4;
+    white-space: pre-wrap;
+  }
+
+  .note-box {
+    margin-top: 8px;
+    background: #fff5f5;
+    padding: 8px;
+    border-radius: 6px;
+    display: flex;
+    gap: 6px;
+
+    .note-icon { font-size: 0.8rem; }
+    .note-text {
+      font-size: 0.75rem;
+      color: #e03131;
+      line-height: 1.3;
+      white-space: pre-wrap;
     }
-    .title { font-weight: bold; margin-bottom: 4px; }
-    .note { font-size: 0.8rem; color: #e53935; }
   }
 }
 </style>
