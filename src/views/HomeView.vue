@@ -30,14 +30,14 @@ onMounted(() => {
   fetchSchedule(); // 데이터 로딩 시작
 });
 
-// [기능 1] 리스트 클릭 -> 지도 이동
+// 리스트 클릭 -> 지도 이동
 const handleListClick = (item: ScheduleItem) => {
   if (!item.lat || !item.lng) return;
   // MapView가 노출(expose)한 flyToLocation 함수 실행
   mapViewRef.value?.flyToLocation(item.lat, item.lng);
 };
 
-// [기능 2] 마커 클릭 -> (필요 시 로직 추가)
+// 마커 클릭 -> (필요 시 로직 추가)
 const handleMarkerClick = (item: ScheduleItem) => {
   console.log("마커 클릭됨:", item.content);
 };

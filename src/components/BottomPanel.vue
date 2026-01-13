@@ -202,7 +202,7 @@ const endDrag = () => {
 }
 
 .panel-handle-area {
-  padding: 12px 0;
+  padding: 14px 0;
   display: flex;
   justify-content: center;
   cursor: grab;
@@ -224,7 +224,7 @@ const endDrag = () => {
 
   button {
     flex: 1;
-    padding: 12px 0;
+    padding: 2px 0 12px 0;
     border: none;
     background: white;
     font-weight: 600;
@@ -247,7 +247,7 @@ const endDrag = () => {
   background: #f8f9fa; /* 배경을 아주 연한 회색으로 */
 }
 
-/* 📅 타임라인 스타일 시작 */
+/* 타임라인 스타일 시작 */
 
 .date-header {
   position: sticky;
