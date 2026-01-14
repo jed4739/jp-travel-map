@@ -67,6 +67,12 @@
                 <span class="note-icon">⚠️</span>
                 <span class="note-text">{{ item.note }}</span>
               </div>
+
+              <div class="card-actions">
+                <button class="detail-btn" @click.stop="openDetailPopup(item)">
+                  <span>📝 메모 & 정보</span>
+                </button>
+              </div>
             </div>
           </div>
         </template>
@@ -81,11 +87,20 @@
       </div>
     </div>
   </div>
+
+  <DetailPopup
+      :is-open="isPopupOpen"
+      :item="selectedItem"
+      :loading="isPopupLoading"
+      @close="isPopupOpen = false"
+      @save="handleSaveMemo"
+  />
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue';
 import type { ScheduleItem } from '../composables/useSchedule';
+import DetailPopup from './DetailPopup.vue';
 
 const props = defineProps<{
   items: ScheduleItem[];
@@ -106,16 +121,95 @@ const isDragging = ref(false);
 let startY = 0;
 let startHeight = 0;
 
-// 날짜가 바뀌는지 확인 (헤더용)
+const isPopupOpen = ref(false);
+const isPopupLoading = ref(false);
+const selectedItem = ref<any>({});
+
+// 1. 상세 정보 조회 API
+const fetchDetailInfo = async (date: string, timeRange: string) => {
+  const startTime = timeRange.split(/~|\n/)[0].trim();
+  const params = new URLSearchParams({
+    date: date,
+    time: startTime
+  }).toString();
+
+  try {
+    const response = await fetch(`/api/v1/schedules/detail?${params}`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+    if (!response.ok) throw new Error(`Status: ${response.status}`);
+    const result = await response.json();
+    return result.data;
+  } catch (error) {
+    console.error('Fetch Detail Error:', error);
+    throw error;
+  }
+};
+
+// 2. 팝업 열기 핸들러
+const openDetailPopup = async (item: ScheduleItem) => {
+  selectedItem.value = { ...item }; // 기본 정보 먼저 표시
+  isPopupOpen.value = true;
+  isPopupLoading.value = true;
+
+  try {
+    const detailData = await fetchDetailInfo(item.date, item.timeRange);
+
+    // 받아온 정보 병합 (주소, 메모 등)
+    selectedItem.value = {
+      ...selectedItem.value,
+      address: detailData.address,
+      note: detailData.note,
+    };
+  } catch (error) {
+    console.error("상세 정보 로딩 실패");
+  } finally {
+    isPopupLoading.value = false;
+  }
+};
+
+// 3. 메모 저장 API 핸들러
+const handleSaveMemo = async (updatedItem: any) => {
+  const startTime = updatedItem.timeRange.split(/~|\n/)[0].trim();
+
+  try {
+    const response = await fetch('/api/v1/schedules/memo', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        date: updatedItem.date,
+        time: startTime,
+        note: updatedItem.note
+      })
+    });
+
+    if (!response.ok) throw new Error(`Save Failed: ${response.status}`);
+
+    alert("저장되었습니다! ✅");
+
+    // (선택 사항) 리스트에 있는 원본 데이터도 갱신하여 UI 즉시 반영
+    const target = props.items.find(i => i.date === updatedItem.date && i.timeRange === updatedItem.timeRange);
+    if (target) {
+      target.note = updatedItem.note;
+    }
+
+  } catch (error) {
+    console.error('Save Error:', error);
+    alert("저장에 실패했습니다.");
+  }
+};
+
+
 const isNewDay = (index: number) => {
   if (index === 0) return true;
   return props.items[index].date !== props.items[index - 1].date;
 };
 
-// 시간 중복 확인 (대안 일정 묶기용)
 const isSameTimeAsPrev = (index: number) => {
   if (index === 0) return false;
-  if (isNewDay(index)) return false; // 날짜가 바뀌면 시간 같아도 분리
+  if (isNewDay(index)) return false;
   const prev = props.items[index - 1];
   const curr = props.items[index];
   return prev.timeRange === curr.timeRange;
@@ -125,7 +219,6 @@ const isAlternative = (item: ScheduleItem) => {
   return item.content.includes('(대안)') || item.content.includes('선택');
 };
 
-// 날짜에서 요일만 추출 (예: '2.04 (수)' -> '수')
 const getDay = (dateStr: string) => {
   const match = dateStr.match(/\((.*?)\)/);
   return match ? match[1] : '';
@@ -133,17 +226,15 @@ const getDay = (dateStr: string) => {
 
 const getStartTime = (range: string) => {
   if (!range) return '';
-  // 줄바꿈이나 물결표 기준으로 앞부분만 자름
   return range.split(/~|\n/)[0].trim();
 };
 
 const getEndTime = (range: string) => {
   if (!range || !range.includes('~')) return '';
-  // 뒷부분 자름
   return range.split('~')[1].trim();
 };
 
-// ... 드래그 관련 함수들 (기존과 동일) ...
+// 드래그 관련 함수
 const changeTab = (tabId: string) => {
   currentTab.value = tabId;
   if (panelHeight.value < 20) panelHeight.value = 45;
@@ -178,6 +269,7 @@ const endDrag = () => {
 </script>
 
 <style scoped lang="scss">
+
 /* 기본 패널 스타일 */
 .bottom-panel {
   position: absolute;
@@ -244,7 +336,7 @@ const endDrag = () => {
   overflow-y: auto;
   padding-left: 20px;
   padding-right: 20px;
-  background: #f8f9fa; /* 배경을 아주 연한 회색으로 */
+  background: #f8f9fa; /* 아주 연한 회색 */
 }
 
 /* 타임라인 스타일 시작 */
@@ -281,12 +373,11 @@ const endDrag = () => {
 }
 
 .schedule-item-wrapper {
-  display: flex; /* 가로 정렬 핵심 */
+  display: flex;
   gap: 12px;
-  margin-bottom: 15px; /* 아이템 간 간격 */
+  margin-bottom: 15px;
   position: relative;
 
-  /* 대안 일정 스타일 */
   &.is-alternative {
     opacity: 0.85;
     .info-card {
@@ -333,11 +424,10 @@ const endDrag = () => {
   display: flex;
   justify-content: center;
 
-  /* 세로 선 */
   .line {
     position: absolute;
     top: 5px;
-    bottom: -20px; /* 다음 아이템까지 이어지게 */
+    bottom: -20px;
     width: 2px;
     background: #e9ecef;
   }
@@ -348,8 +438,8 @@ const endDrag = () => {
     height: 12px;
     border-radius: 50%;
     background: #ccc;
-    z-index: 1; /* 선보다 위에 */
-    margin-top: 8px; /* 시간 텍스트와 높이 맞춤 */
+    z-index: 1;
+    margin-top: 8px;
     border: 2px solid white;
     box-shadow: 0 0 0 1px rgba(0,0,0,0.1);
 
@@ -371,6 +461,9 @@ const endDrag = () => {
   box-shadow: 0 2px 8px rgba(0,0,0,0.04);
   cursor: pointer;
   transition: transform 0.1s;
+
+  display: flex;
+  flex-direction: column;
 
   &:active {
     transform: scale(0.98);
@@ -430,6 +523,37 @@ const endDrag = () => {
       color: #e03131;
       line-height: 1.3;
       white-space: pre-wrap;
+    }
+  }
+
+  .card-actions {
+    margin-top: 10px;
+    display: flex;
+    justify-content: flex-end;
+
+    .detail-btn {
+      background: transparent;
+      border: 1px solid #e9ecef;
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 0.75rem;
+      color: #868e96;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.2s;
+
+      &:hover {
+        background: #f8f9fa;
+        color: #333;
+        border-color: #ced4da;
+      }
+
+      &:active {
+        background: #e9ecef;
+      }
     }
   }
 }

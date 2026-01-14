@@ -8,7 +8,7 @@
     </div>
 
     <button class="my-location-btn" @click="moveToMyLocation">
-      내 위치
+      <img :src="icMyLocation" alt="내 위치">
     </button>
 
     <div ref="popupContainer" class="popup-overlay">
@@ -24,6 +24,7 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue';
 import 'ol/ol.css';
+import icMyLocation from '../assets/ic_my_location.svg';
 import Map from 'ol/Map';
 import View from 'ol/View';
 import TileLayer from 'ol/layer/Tile';
@@ -122,7 +123,7 @@ onMounted(() => {
       myLocationLayer
     ],
     view: new View({
-      center: fromLonLat([139.6917, 35.6895]), // 도쿄
+      center: fromLonLat([139.75982642460093, 35.64244258194261]), // 도쿄
       zoom: 12,
     }),
     overlays: [overlay.value],
@@ -377,6 +378,7 @@ defineExpose({ flyToLocation });
   cursor: pointer;
   border-radius: 4px;
   font-weight: bold;
+  font-size: 16px;
 }
 
 /* 활성화된 버튼 색상 (Vue 느낌의 녹색) */
@@ -386,18 +388,37 @@ defineExpose({ flyToLocation });
   border-color: #42b983;
 }
 
-/* [우측 상단] 스타일 */
 .my-location-btn {
   position: absolute;
   top: 10px;
   right: 10px;
-  z-index: 1000;
-  background: white;
-  border: 1px solid #ccc;
-  padding: 8px 12px;
+  z-index: 10;
+
+  /* 기존 버튼 꾸미기 스타일 유지 */
+  background-color: white;
+  border: none;
+  border-radius: 24px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  width: 48px;
+  height: 48px;
   cursor: pointer;
-  border-radius: 4px;
-  font-weight: bold;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
+.my-location-btn:hover {
+  background-color: #f1f1f1;
+}
+
+.my-location-btn:active {
+  background-color: #e6e6e6;
+}
+
+/* 내부 이미지(SVG) 사이즈 조절 */
+.my-location-btn img {
+  width: 32px;
+  height: 32px;
+  display: block;
+}
+
 </style>
