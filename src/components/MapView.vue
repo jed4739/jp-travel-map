@@ -28,7 +28,6 @@ import icMyLocation from '../assets/ic_my_location.svg';
 import Map from 'ol/Map';
 import View from 'ol/View';
 import TileLayer from 'ol/layer/Tile';
-// import OSM from 'ol/source/OSM';
 import { fromLonLat } from 'ol/proj';
 import VectorLayer from 'ol/layer/Vector';
 import VectorSource from 'ol/source/Vector';
@@ -43,7 +42,6 @@ const props = defineProps<{
   scheduleItems: ScheduleItem[];
 }>();
 
-// 파란색 점 스타일 (구글맵 현재위치 느낌)
 const myLocationStyle = new Style({
   image: new Circle({
     radius: 8,
@@ -65,12 +63,10 @@ const currentMyPosition = ref<number[] | null>(null);
 
 const baseLayer = new TileLayer({
   source: new XYZ({
-    // 기본값: 지형도(p)
     url: 'https://mt1.google.com/vt/lyrs=p&x={x}&y={y}&z={z}'
   })
 });
 
-// 내위치 추적용
 let watchId: number | null = null;
 const myLocationSource = new VectorSource();
 const myLocationLayer = new VectorLayer({
@@ -102,18 +98,14 @@ const vectorLayer = new VectorLayer({
 onMounted(() => {
   if (!mapContainer.value || !popupContainer.value) return;
 
-  overlay.value = new Overlay({
+  const overlayInstance = new Overlay({
     element: popupContainer.value,
-
-    // JS 계산 끄고 왼쪽 위 기준으로 (CSS로 중앙 맞춤)
     positioning: 'top-left',
     offset: [0, 0],
-
-    // stopEvent: true (필수!)
-    // 의미: 말풍선을 클릭하면, 그 클릭이 지도로 전달되지 않게 막아라!
     stopEvent: true,
   });
 
+  overlay.value = overlayInstance;
 
   map.value = new Map({
     target: mapContainer.value,
@@ -123,36 +115,30 @@ onMounted(() => {
       myLocationLayer
     ],
     view: new View({
-      center: fromLonLat([139.75982642460093, 35.64244258194261]), // 도쿄
+      center: fromLonLat([139.75982642460093, 35.64244258194261]),
       zoom: 12,
     }),
-    overlays: [overlay.value],
+    overlays: [overlayInstance],
     controls: []
   });
 
   map.value.on('click', (e) => {
-    // stopEvent: true 덕분에, 말풍선을 클릭했을 때는 이 함수가 실행되지 않습니다.
-    // 즉, "빈 지도"를 클릭했을 때만 실행됩니다.
     const feature = map.value?.forEachFeatureAtPixel(e.pixel, (f) => f);
 
     if (feature) {
       const item = feature.get('data') as ScheduleItem;
-
       if (!item) return;
 
       selectedItem.value = item;
-      const coordinates = (feature.getGeometry() as Point).getCoordinates();
-      overlay.value?.setPosition(coordinates);
-      flyToLocation(item.lat, item.lng);
-      emit('marker-click', item);
+      const geometry = feature.getGeometry();
+      if (geometry instanceof Point) {
+        const coordinates = geometry.getCoordinates();
+        overlay.value?.setPosition(coordinates);
+        flyToLocation(item.lat, item.lng);
+        emit('marker-click', item);
+      }
     }
-    /* // 빈공간 클릭시 팝업 제거
-    else {
-      // 빈 곳을 클릭했으므로 닫기
-      closePopup();
-    }*/
   });
-  // 내위치 추적
   startTracking();
 });
 
@@ -170,24 +156,16 @@ watch(() => props.scheduleItems, (newItems) => {
   });
 });
 
-// 지도 타입(위성/지형) 변경 함수
 const changeMapType = (type: 'terrain' | 'satellite') => {
   currentLayer.value = type;
-
-  // 타입에 따라 URL 결정
   const newUrl = type === 'satellite'
-      ? 'https://mt1.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}' // 위성(s)+라벨(h)
-      : 'https://mt1.google.com/vt/lyrs=p&x={x}&y={y}&z={z}';  // 지형도(p)
-
-  // OpenLayers 방식: 기존 레이어의 소스(Source)만 샥 바꿔치기
+      ? 'https://mt1.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}'
+      : 'https://mt1.google.com/vt/lyrs=p&x={x}&y={y}&z={z}';
   baseLayer.setSource(new XYZ({ url: newUrl }));
 };
 
-// 앱 켜지면 무조건 내위치로 이동: 내 위치를 계속 감시하고 파란 점만 찍음 (지도는 이동 안 함)
 const startTracking = () => {
   if (!navigator.geolocation) return;
-
-  // 기존 추적 해제 (중복 방지)
   if (watchId !== null) navigator.geolocation.clearWatch(watchId);
 
   watchId = navigator.geolocation.watchPosition(
@@ -195,13 +173,14 @@ const startTracking = () => {
         const { latitude, longitude } = position.coords;
         const center = fromLonLat([longitude, latitude]);
 
-        // 1. 현재 위치 좌표를 변수에 저장 (버튼 누르면 여기로 가려고)
         currentMyPosition.value = center;
 
-        // 2. 지도상에 파란 점(마커) 업데이트
         const existingFeature = myLocationSource.getFeatures()[0];
         if (existingFeature) {
-          (existingFeature.getGeometry() as Point).setCoordinates(center);
+          const geom = existingFeature.getGeometry();
+          if (geom instanceof Point) {
+            geom.setCoordinates(center);
+          }
         } else {
           const feature = new Feature({ geometry: new Point(center) });
           feature.setStyle(myLocationStyle);
@@ -213,32 +192,32 @@ const startTracking = () => {
   );
 };
 
-// 내위치 버튼 클릭 시 실행: 저장된 내 위치로 '카메라만' 이동
+// 타입 단언(Assertion)을 사용하여 TS 에러 강제 해결
 const moveToMyLocation = () => {
-  // 실제 이동을 수행하는 내부 함수 (Offset 로직 포함)
   const animateToPosition = (originalCenter: number[]) => {
     if (!map.value) return;
 
     const view = map.value.getView();
     const size = map.value.getSize();
-    const targetZoom = 16; // 내 위치 줌 레벨 (flyToLocation과 동일하게 16 추천)
 
-    let newCenter = originalCenter;
+    // Size가 없으면 동작 안 함
+    if (!size) return;
 
-    if (size) {
-      const mapHeight = size[1];
-      // 화면 높이의 25% (flyToLocation과 동일한 비율)
-      const pixelOffset = mapHeight * 0.25;
+    const targetZoom = 16;
 
-      // 해당 줌 레벨에서의 해상도(픽셀당 지도 거리)를 가져옴
-      const resolution = view.getResolutionForZoom(targetZoom);
+    // "이건 무조건 숫자 배열 [x, y]야" 라고 TS에게 알림
+    const [x, y] = originalCenter as [number, number];
 
-      // 픽셀 오프셋을 지도 좌표 오프셋으로 변환
-      const offsetY = pixelOffset * resolution;
+    const mapHeight = size[1] as number;
 
-      // 카메라 중심을 Y축 아래로 내림 -> 결과적으로 아이콘은 화면 위로 올라감
-      newCenter = [originalCenter[0], originalCenter[1] - offsetY];
-    }
+    // resolution이 없으면 0으로 처리 (! 대신 || 0 사용)
+    const resolution = view.getResolutionForZoom(targetZoom) || 0;
+
+    const pixelOffset = mapHeight * 0.25;
+    const offsetY = pixelOffset * resolution;
+
+    // newCenter는 무조건 숫자 배열임을 명시
+    const newCenter: [number, number] = [x, y - offsetY];
 
     view.animate({
       center: newCenter,
@@ -248,15 +227,12 @@ const moveToMyLocation = () => {
     });
   };
 
-  // 1. 이미 추적된 위치가 있으면 바로 이동
   if (currentMyPosition.value) {
     animateToPosition(currentMyPosition.value);
   }
-  // 2. 없으면 새로 조회해서 이동
   else if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition((pos) => {
       const center = fromLonLat([pos.coords.longitude, pos.coords.latitude]);
-      // 조회된 위치도 저장해둠
       currentMyPosition.value = center;
       animateToPosition(center);
     });
@@ -265,21 +241,26 @@ const moveToMyLocation = () => {
   }
 };
 
+// 타입 단언(Assertion)을 사용하여 TS 에러 강제 해결
 const flyToLocation = (lat: number, lng: number) => {
   if (!map.value) return;
   const view = map.value.getView();
   const targetZoom = 16;
-  const targetLocation = fromLonLat([lng, lat]);
+
+  // 변환된 좌표는 무조건 [number, number] 형식이므로 단언
+  const targetLocation = fromLonLat([lng, lat]) as [number, number];
 
   const size = map.value.getSize();
-  let offsetY = 0;
-  if (size) {
-    const mapHeight = size[1];
-    const pixelOffset = mapHeight * 0.25;
-    const resolution = view.getResolutionForZoom(targetZoom);
-    offsetY = pixelOffset * resolution;
-  }
-  const newCenter = [targetLocation[0], targetLocation[1] - offsetY];
+  if (!size) return;
+
+  const mapHeight = size[1] as number;
+  const pixelOffset = mapHeight * 0.25;
+  const resolution = view.getResolutionForZoom(targetZoom) || 0;
+
+  const offsetY = pixelOffset * resolution;
+
+  // newCenter 타입 명시
+  const newCenter: [number, number] = [targetLocation[0], targetLocation[1] - offsetY];
 
   const targetItem = props.scheduleItems.find(i => i.lat === lat && i.lng === lng);
   if (targetItem) {

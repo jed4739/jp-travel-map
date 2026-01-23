@@ -127,7 +127,10 @@ const selectedItem = ref<any>({});
 
 // 1. 상세 정보 조회 API
 const fetchDetailInfo = async (date: string, timeRange: string) => {
-  const startTime = timeRange.split(/~|\n/)[0].trim();
+  // ?.로 접근하고 없으면 빈 문자열 반환
+  const safeTimeRange = timeRange || '';
+  const startTime = safeTimeRange.split(/~|\n/)[0]?.trim() || '';
+
   const params = new URLSearchParams({
     date: date,
     time: startTime
@@ -150,14 +153,12 @@ const fetchDetailInfo = async (date: string, timeRange: string) => {
 
 // 2. 팝업 열기 핸들러
 const openDetailPopup = async (item: ScheduleItem) => {
-  selectedItem.value = { ...item }; // 기본 정보 먼저 표시
+  selectedItem.value = { ...item };
   isPopupOpen.value = true;
   isPopupLoading.value = true;
 
   try {
     const detailData = await fetchDetailInfo(item.date, item.timeRange);
-
-    // 받아온 정보 병합 (주소, 메모 등)
     selectedItem.value = {
       ...selectedItem.value,
       address: detailData.address,
@@ -172,7 +173,9 @@ const openDetailPopup = async (item: ScheduleItem) => {
 
 // 3. 메모 저장 API 핸들러
 const handleSaveMemo = async (updatedItem: any) => {
-  const startTime = updatedItem.timeRange.split(/~|\n/)[0].trim();
+  // 안전한 접근
+  const safeTimeRange = updatedItem.timeRange || '';
+  const startTime = safeTimeRange.split(/~|\n/)[0]?.trim() || '';
 
   try {
     const response = await fetch('/api/v1/schedules/memo', {
@@ -186,25 +189,24 @@ const handleSaveMemo = async (updatedItem: any) => {
     });
 
     if (!response.ok) throw new Error(`Save Failed: ${response.status}`);
+    alert("저장되었습니다!");
 
-    alert("저장되었습니다! ✅");
-
-    // (선택 사항) 리스트에 있는 원본 데이터도 갱신하여 UI 즉시 반영
     const target = props.items.find(i => i.date === updatedItem.date && i.timeRange === updatedItem.timeRange);
     if (target) {
       target.note = updatedItem.note;
     }
-
   } catch (error) {
     console.error('Save Error:', error);
     alert("저장에 실패했습니다.");
   }
 };
 
-
 const isNewDay = (index: number) => {
   if (index === 0) return true;
-  return props.items[index].date !== props.items[index - 1].date;
+  const curr = props.items[index];
+  const prev = props.items[index - 1];
+  if (!curr || !prev) return true;
+  return curr.date !== prev.date;
 };
 
 const isSameTimeAsPrev = (index: number) => {
@@ -212,51 +214,63 @@ const isSameTimeAsPrev = (index: number) => {
   if (isNewDay(index)) return false;
   const prev = props.items[index - 1];
   const curr = props.items[index];
+  if (!prev || !curr) return false;
   return prev.timeRange === curr.timeRange;
 };
 
 const isAlternative = (item: ScheduleItem) => {
+  if (!item || !item.content) return false;
   return item.content.includes('(대안)') || item.content.includes('선택');
 };
 
 const getDay = (dateStr: string) => {
+  if (!dateStr) return '';
   const match = dateStr.match(/\((.*?)\)/);
   return match ? match[1] : '';
 };
 
+// ?.trim() 및 || '' 추가로 undefined 방지
 const getStartTime = (range: string) => {
   if (!range) return '';
-  return range.split(/~|\n/)[0].trim();
+  return range.split(/~|\n/)[0]?.trim() || '';
 };
 
+// ?.trim() 및 || '' 추가로 undefined 방지
 const getEndTime = (range: string) => {
   if (!range || !range.includes('~')) return '';
-  return range.split('~')[1].trim();
+  return range.split('~')[1]?.trim() || '';
 };
 
-// 드래그 관련 함수
 const changeTab = (tabId: string) => {
   currentTab.value = tabId;
   if (panelHeight.value < 20) panelHeight.value = 45;
 };
 
 const startDrag = (e: TouchEvent) => {
-  isDragging.value = true;
-  startY = e.touches[0].clientY;
-  startHeight = panelHeight.value;
+  // 터치 객체가 있는지 확인 후 접근
+  const touch = e.touches[0];
+  if (touch) {
+    isDragging.value = true;
+    startY = touch.clientY;
+    startHeight = panelHeight.value;
+  }
 };
 
 const onDrag = (e: TouchEvent) => {
   if (!isDragging.value) return;
-  const currentY = e.touches[0].clientY;
-  const deltaY = currentY - startY;
-  const windowHeight = window.innerHeight;
-  const deltaPercent = (deltaY / windowHeight) * 100;
+  // 터치 객체가 있는지 확인 후 접근
+  const touch = e.touches[0];
+  if (touch) {
+    const currentY = touch.clientY;
+    const deltaY = currentY - startY;
+    const windowHeight = window.innerHeight;
+    const deltaPercent = (deltaY / windowHeight) * 100;
 
-  let newHeight = startHeight - deltaPercent;
-  if (newHeight < 10) newHeight = 10;
-  if (newHeight > 95) newHeight = 95;
-  panelHeight.value = newHeight;
+    let newHeight = startHeight - deltaPercent;
+    if (newHeight < 10) newHeight = 10;
+    if (newHeight > 95) newHeight = 95;
+    panelHeight.value = newHeight;
+  }
 };
 
 const endDrag = () => {
