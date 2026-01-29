@@ -1,12 +1,17 @@
 import { createApp } from 'vue'
 import App from './App.vue'
-import router from './router' // 라우터 설정 파일 가져오기
+import router from './router'
+import vue3GoogleLogin from 'vue3-google-login'
 
-import './assets/main.css' // 스타일 (파일 없으면 이 줄은 지우셔도 됩니다)
+import './assets/main.css'
 
 const app = createApp(App)
 
-// app.mount('#app') 하기 전에 반드시 router를 use 해야 합니다!
 app.use(router)
+
+app.use(vue3GoogleLogin, {
+    // Google OAuth Client ID (JapanTravelMap)
+    clientId: '10304501802-hvc21io7mrlp7mlrt0gij5tsilu8duns.apps.googleusercontent.com'
+})
 
 app.mount('#app')

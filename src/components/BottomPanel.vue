@@ -70,7 +70,7 @@
 
               <div class="card-actions">
                 <button class="detail-btn" @click.stop="openDetailPopup(item)">
-                  <span>📝 메모 & 정보</span>
+                  <span>메모 & 정보</span>
                 </button>
               </div>
             </div>
@@ -101,6 +101,7 @@
 import { ref } from 'vue';
 import type { ScheduleItem } from '../composables/useSchedule';
 import DetailPopup from './DetailPopup.vue';
+import { api } from '../utils/commonAPI';
 
 const props = defineProps<{
   items: ScheduleItem[];
@@ -137,12 +138,10 @@ const fetchDetailInfo = async (date: string, timeRange: string) => {
   }).toString();
 
   try {
-    const response = await fetch(`/api/v1/schedules/detail?${params}`, {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' }
-    });
+    const response = await api(`/schedules/detail?${params}`);
 
     if (!response.ok) throw new Error(`Status: ${response.status}`);
+
     const result = await response.json();
     return result.data;
   } catch (error) {
@@ -174,27 +173,28 @@ const openDetailPopup = async (item: ScheduleItem) => {
 // 3. 메모 저장 API 핸들러
 const handleSaveMemo = async (updatedItem: any) => {
   // 안전한 접근
-  const safeTimeRange = updatedItem.timeRange || '';
-  const startTime = safeTimeRange.split(/~|\n/)[0]?.trim() || '';
 
   try {
-    const response = await fetch('/api/v1/schedules/memo', {
+    const response = await api('/schedules/memo', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        date: updatedItem.date,
-        time: startTime,
+        id: updatedItem.id,
         note: updatedItem.note
       })
     });
 
     if (!response.ok) throw new Error(`Save Failed: ${response.status}`);
+
     alert("저장되었습니다!");
 
-    const target = props.items.find(i => i.date === updatedItem.date && i.timeRange === updatedItem.timeRange);
+    // 저장 성공 시, 화면의 리스트에도 즉시 반영 (새로고침 없이)
+    const target = props.items.find(i => i.id === updatedItem.id);
     if (target) {
       target.note = updatedItem.note;
     }
+
+    isPopupOpen.value = false;
   } catch (error) {
     console.error('Save Error:', error);
     alert("저장에 실패했습니다.");
