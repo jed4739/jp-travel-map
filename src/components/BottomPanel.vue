@@ -127,18 +127,10 @@ const isPopupLoading = ref(false);
 const selectedItem = ref<any>({});
 
 // 1. 상세 정보 조회 API
-const fetchDetailInfo = async (date: string, timeRange: string) => {
-  // ?.로 접근하고 없으면 빈 문자열 반환
-  const safeTimeRange = timeRange || '';
-  const startTime = safeTimeRange.split(/~|\n/)[0]?.trim() || '';
-
-  const params = new URLSearchParams({
-    date: date,
-    time: startTime
-  }).toString();
+const fetchDetailInfo = async (id: number) => {
 
   try {
-    const response = await api(`/schedules/detail?${params}`);
+    const response = await api(`/schedules/detail?id=${id}`);
 
     if (!response.ok) throw new Error(`Status: ${response.status}`);
 
@@ -157,7 +149,7 @@ const openDetailPopup = async (item: ScheduleItem) => {
   isPopupLoading.value = true;
 
   try {
-    const detailData = await fetchDetailInfo(item.date, item.timeRange);
+    const detailData = await fetchDetailInfo(item.id);
     selectedItem.value = {
       ...selectedItem.value,
       address: detailData.address,

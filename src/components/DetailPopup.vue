@@ -94,6 +94,7 @@ const copyAddress = async () => {
 
 const openGoogleMap = () => {
   const query = props.item.address || props.item.content; // 주소 없으면 이름으로 검색
+  console.log(props.item)
   window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`, '_blank');
 };
 </script>
