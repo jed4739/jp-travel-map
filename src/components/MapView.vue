@@ -3,8 +3,8 @@
     <div ref="mapContainer" class="map-container"></div>
 
     <div class="map-controls-left">
-      <button @click="changeMapType('terrain')" :class="{ active: currentLayer === 'terrain' }">2D지도</button>
-      <button @click="changeMapType('satellite')" :class="{ active: currentLayer === 'satellite' }">위성지도</button>
+      <button @click="changeMapType('terrain')" :class="{ active: currentLayer === 'terrain' }">일반</button>
+      <button @click="changeMapType('satellite')" :class="{ active: currentLayer === 'satellite' }">위성</button>
     </div>
 
     <button class="my-location-btn" @click="moveToMyLocation">
@@ -213,7 +213,7 @@ const moveToMyLocation = () => {
     // resolution이 없으면 0으로 처리 (! 대신 || 0 사용)
     const resolution = view.getResolutionForZoom(targetZoom) || 0;
 
-    const pixelOffset = mapHeight * 0.25;
+    const pixelOffset = mapHeight * 0.2;
     const offsetY = pixelOffset * resolution;
 
     // newCenter는 무조건 숫자 배열임을 명시
@@ -254,7 +254,7 @@ const flyToLocation = (lat: number, lng: number) => {
   if (!size) return;
 
   const mapHeight = size[1] as number;
-  const pixelOffset = mapHeight * 0.25;
+  const pixelOffset = mapHeight * 0.2;
   const resolution = view.getResolutionForZoom(targetZoom) || 0;
 
   const offsetY = pixelOffset * resolution;
@@ -349,17 +349,29 @@ defineExpose({ flyToLocation });
   left: 10px;
   z-index: 1000; /* 지도 위에 떠야 함 */
   display: flex;
-  gap: 5px;
+
+  /* 그림자 */
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+  overflow: hidden;
 }
 
 .map-controls-left button {
   background: white;
-  border: 1px solid #ccc;
+  border: none;
   padding: 8px 12px;
   cursor: pointer;
-  border-radius: 4px;
   font-weight: bold;
   font-size: 16px;
+}
+
+.map-controls-left button:nth-child(1) {
+  border-radius: 4px 0 0 4px;   /* 좌측만 둥글게 */
+}
+
+/* 두 번째 버튼 */
+.map-controls-left button:nth-child(2) {
+  border-radius: 0 4px 4px 0;   /* 우측만 둥글게 */
 }
 
 /* 활성화된 버튼 색상 (Vue 느낌의 녹색) */
