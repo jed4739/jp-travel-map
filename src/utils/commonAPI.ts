@@ -1,10 +1,15 @@
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1'; // 개발용 기본값
 
-// 액세스 토큰은 메모리 변수에 저장 (새로고침하면 날아감 -> 재발급 받으면 됨)
-let accessToken = '';
+// 액세스 토큰은 로컬스토리지
+let accessToken = localStorage.getItem('accessToken') || '';
 
 export const setAccessToken = (token: string) => {
     accessToken = token;
+    localStorage.setItem('accessToken', token);
+};
+export const removeAccessToken = () => {
+    accessToken = '';
+    localStorage.removeItem('accessToken');
 };
 
 export const getAccessToken = () => accessToken;
@@ -60,7 +65,7 @@ export const api = async (url: string, options: RequestInit = {}) => {
         } catch (error) {
             console.error("로그인 세션이 만료되었습니다.");
             // 로그아웃 처리 (메인으로 튕기거나 로그인 모달 띄우기)
-            setAccessToken('');
+            removeAccessToken();
             window.location.href = '/login'; // 로그인 페이지로 이동
             throw error;
         }

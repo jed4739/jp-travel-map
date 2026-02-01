@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '../views/HomeView.vue'
 import LoginView from '../views/LoginView.vue'
-import { auth } from '../firebase' // firebase.ts에서 auth 가져오기
+import { getAccessToken } from '../utils/commonAPI'
 
 // TypeScript에서 meta 필드 인식을 위해 타입 확장
 declare module 'vue-router' {
@@ -22,24 +22,27 @@ const router = createRouter({
         {
             path: '/login',
             name: 'login',
-            component: LoginView
+            component: LoginView,
+            beforeEnter: (_to, _from, next) => {
+              if (getAccessToken()) next('/');
+              else next();
+            }
         }
     ]
 })
 
-// 네비게이션 가드 (로그인 안 한 사람 튕겨내기)
+// 네비게이션 가드 수정
 router.beforeEach((to, _from, next) => {
     const requiresAuth = to.matched.some(record => record.meta.requiresAuth)
+    const token = getAccessToken() // 우리 백엔드 토큰 가져오기
 
-    // Firebase Auth 초기화 대기
-    // (새로고침 시 로그인 상태를 확인하기 전까지 잠깐 대기하는 로직이 필요할 수 있음)
-    auth.onAuthStateChanged((user) => {
-        if (requiresAuth && !user) {
-            next('/login') // 로그인 안했으면 로그인 페이지로
-        } else {
-            next() // 통과
-        }
-    })
+    if (requiresAuth && !token) {
+        // 로그인이 필요한데 토큰이 없다면? -> 로그인 페이지로
+        next('/login')
+    } else {
+        // 그 외엔 통과
+        next()
+    }
 })
 
 export default router
