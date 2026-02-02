@@ -134,7 +134,7 @@ onMounted(() => {
       if (geometry instanceof Point) {
         const coordinates = geometry.getCoordinates();
         overlay.value?.setPosition(coordinates);
-        flyToLocation(item.lat, item.lng);
+        flyToLocation(item.latitude, item.longitude);
         emit('marker-click', item);
       }
     }
@@ -146,9 +146,9 @@ watch(() => props.scheduleItems, (newItems) => {
   if (!newItems) return;
   vectorSource.clear();
   newItems.forEach((item) => {
-    if (isNaN(item.lat) || isNaN(item.lng)) return;
+    if (isNaN(item.latitude) || isNaN(item.longitude)) return;
     const feature = new Feature({
-      geometry: new Point(fromLonLat([item.lng, item.lat])),
+      geometry: new Point(fromLonLat([item.longitude, item.latitude])),
       data: item
     });
     feature.setStyle(getMarkerStyle(item.category));
@@ -262,7 +262,7 @@ const flyToLocation = (lat: number, lng: number) => {
   // newCenter 타입 명시
   const newCenter: [number, number] = [targetLocation[0], targetLocation[1] - offsetY];
 
-  const targetItem = props.scheduleItems.find(i => i.lat === lat && i.lng === lng);
+  const targetItem = props.scheduleItems.find(i => i.latitude === lat && i.longitude === lng);
   if (targetItem) {
     selectedItem.value = targetItem;
     overlay.value?.setPosition(targetLocation);
