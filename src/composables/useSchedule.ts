@@ -9,15 +9,13 @@ export interface ScheduleItem {
     date: string;       // 예: "2026.02.04 (수)"
     timeRange: string;  // 예: "12:30 ~ 14:00"
     content: string;    // 장소명
-    lat: number;        // 위도
-    lng: number;        // 경도
+    latitude: number;        // 위도
+    longitude: number;        // 경도
     category: string;   // 카테고리 (FOOD, SIGHT 등)
     note?: string;      // 리스트에 보여줄 간단한 메모
+    address?: string;
 }
 
-// ==========================================
-// Composable 함수
-// ==========================================
 export function useSchedule() {
     // 반응형 상태 변수
     const scheduleData = ref<ScheduleItem[]>([]);
@@ -60,9 +58,6 @@ export function useSchedule() {
         } catch (err: any) {
             console.error('Failed to fetch schedules:', err);
             error.value = '일정 데이터를 서버에서 불러오지 못했습니다.';
-
-            // (선택사항) 에러 시 빈 배열 처리
-            scheduleData.value = [];
         } finally {
             isLoading.value = false;
         }

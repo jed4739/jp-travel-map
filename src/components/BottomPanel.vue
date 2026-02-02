@@ -25,16 +25,31 @@
 
     <div class="panel-content">
       <div v-if="currentTab === 'schedule'" class="schedule-list">
-        <div v-if="loading" class="loading">로딩 중...</div>
+        <div v-if="loading && items.length === 0" class="loading">로딩 중...</div>
         <div v-else-if="items.length === 0" class="empty">일정이 없습니다.</div>
 
         <template v-for="(item, index) in items" :key="index">
 
           <div v-if="isNewDay(index)" class="date-header">
-            <span class="day-badge">{{ getDay(item.date) }}</span>
-            <span class="date-text">{{ item.date }}</span>
-          </div>
+            <div class="header-left">
+              <span class="day-badge">{{ getDay(item.date) }}</span>
+              <span class="date-text">{{ item.date }}</span>
+            </div>
 
+            <button
+                class="header-refresh-btn"
+                @click.stop="$emit('refresh')"
+                :disabled="loading"
+                aria-label="새로고침"
+            >
+              <img
+                  :src="RefreshIcon"
+                  class="refresh-icon"
+                  :class="{ spinning: loading }"
+                  alt="refresh"
+              />
+            </button>
+          </div>
           <div
               class="schedule-item-wrapper"
               :class="{ 'is-alternative': isAlternative(item) }"
@@ -102,13 +117,17 @@ import { ref } from 'vue';
 import type { ScheduleItem } from '../composables/useSchedule';
 import DetailPopup from './DetailPopup.vue';
 import { api } from '../utils/commonAPI';
+import RefreshIcon from '../assets/refresh.svg';
 
 const props = defineProps<{
   items: ScheduleItem[];
   loading: boolean;
 }>();
 
-defineEmits(['item-click']);
+/**
+ * 상세 아이콘 클릭, 새로고침 이벤트 명시
+ */
+defineEmits(['item-click', 'refresh']);
 
 const tabs = [
   { id: 'schedule', label: '일정' },
@@ -164,8 +183,6 @@ const openDetailPopup = async (item: ScheduleItem) => {
 
 // 3. 메모 저장 API 핸들러
 const handleSaveMemo = async (updatedItem: any) => {
-  // 안전한 접근
-
   try {
     const response = await api('/schedules/memo', {
       method: 'POST',
@@ -221,13 +238,13 @@ const getDay = (dateStr: string) => {
   return match ? match[1] : '';
 };
 
-// ?.trim() 및 || '' 추가로 undefined 방지
+/** ?.trim() 및 || '' 추가로 undefined 방지 **/
 const getStartTime = (range: string) => {
   if (!range) return '';
   return range.split(/~|\n/)[0]?.trim() || '';
 };
 
-// ?.trim() 및 || '' 추가로 undefined 방지
+/**  ?.trim() 및 || '' 추가로 undefined 방지 **/
 const getEndTime = (range: string) => {
   if (!range || !range.includes('~')) return '';
   return range.split('~')[1]?.trim() || '';
@@ -239,7 +256,7 @@ const changeTab = (tabId: string) => {
 };
 
 const startDrag = (e: TouchEvent) => {
-  // 터치 객체가 있는지 확인 후 접근
+  /** 터치 객체가 있는지 확인 후 접근 **/
   const touch = e.touches[0];
   if (touch) {
     isDragging.value = true;
@@ -250,7 +267,7 @@ const startDrag = (e: TouchEvent) => {
 
 const onDrag = (e: TouchEvent) => {
   if (!isDragging.value) return;
-  // 터치 객체가 있는지 확인 후 접근
+  /** 터치 객체가 있는지 확인 후 접근 **/
   const touch = e.touches[0];
   if (touch) {
     const currentY = touch.clientY;
@@ -351,13 +368,23 @@ const endDrag = () => {
   position: sticky;
   top: 0;
   z-index: 10;
-  background: rgba(248, 249, 250, 0.95); /* 반투명 배경 */
+  background: rgba(248, 249, 250, 0.95);
   padding: 15px 0 10px 0;
+
+  /* 양쪽 정렬 (날짜 - 버튼) */
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: space-between;
+
   margin-bottom: 10px;
   border-bottom: 1px solid #eee;
+
+  /* 날짜 정보 (좌측 묶음) */
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
 
   .day-badge {
     background: #333;
@@ -376,7 +403,47 @@ const endDrag = () => {
     font-size: 1.1rem;
     color: #222;
   }
+
+  /* 새로고침 버튼 (우측) */
+  .header-refresh-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.6;
+    transition: opacity 0.2s;
+
+    &:hover {
+      opacity: 1;
+    }
+
+    &:disabled {
+      cursor: not-allowed;
+    }
+
+    .refresh-icon {
+      width: 20px;
+      height: 20px;
+
+      /* 로딩 중 회전 애니메이션 */
+      &.spinning {
+        animation: spin 1s linear infinite;
+        filter: invert(28%) sepia(98%) saturate(2334%) hue-rotate(218deg) brightness(98%) contrast(98%);
+      }
+    }
+  }
 }
+
+/* 회전 키프레임 */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* ▲▲▲ [수정 끝] ▲▲▲ */
 
 .schedule-item-wrapper {
   display: flex;
