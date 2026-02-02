@@ -98,13 +98,9 @@
         </template>
       </div>
 
-      <div v-if="currentTab === 'check'" class="check-tab">
-        <h3>준비물 체크리스트</h3>
-      </div>
+      <ChecklistTab v-if="currentTab === 'check'" />
 
-      <div v-if="currentTab === 'info'" class="info-tab">
-        <h3>정보</h3>
-      </div>
+      <InfoTab v-if="currentTab === 'info'" />
     </div>
   </div>
 
@@ -123,6 +119,8 @@ import type { ScheduleItem } from '../composables/useSchedule';
 import DetailPopup from './DetailPopup.vue';
 import { api } from '../utils/commonAPI';
 import RefreshIcon from '../assets/refresh.svg';
+import InfoTab from "./tabs/InfoTab.vue";
+import ChecklistTab from "./tabs/ChecklistTab.vue";
 
 const props = defineProps<{
   items: ScheduleItem[];
