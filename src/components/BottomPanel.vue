@@ -36,20 +36,25 @@
               <span class="date-text">{{ item.date }}</span>
             </div>
 
-            <button
-                class="header-refresh-btn"
-                @click.stop="$emit('refresh')"
-                :disabled="loading"
-                aria-label="새로고침"
-            >
-              <img
-                  :src="RefreshIcon"
-                  class="refresh-icon"
-                  :class="{ spinning: loading }"
-                  alt="refresh"
-              />
-            </button>
+            <div class="header-right">
+              <span class="last-updated">{{ timeAgo }}</span>
+
+              <button
+                  class="header-refresh-btn"
+                  @click.stop="$emit('refresh')"
+                  :disabled="loading"
+                  aria-label="새로고침"
+              >
+                <img
+                    :src="RefreshIcon"
+                    class="refresh-icon"
+                    :class="{ spinning: loading }"
+                    alt="refresh"
+                />
+              </button>
+            </div>
           </div>
+
           <div
               class="schedule-item-wrapper"
               :class="{ 'is-alternative': isAlternative(item) }"
@@ -113,7 +118,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, watch, onMounted, onUnmounted } from 'vue';
 import type { ScheduleItem } from '../composables/useSchedule';
 import DetailPopup from './DetailPopup.vue';
 import { api } from '../utils/commonAPI';
@@ -124,9 +129,6 @@ const props = defineProps<{
   loading: boolean;
 }>();
 
-/**
- * 상세 아이콘 클릭, 새로고침 이벤트 명시
- */
 defineEmits(['item-click', 'refresh']);
 
 const tabs = [
@@ -145,14 +147,48 @@ const isPopupOpen = ref(false);
 const isPopupLoading = ref(false);
 const selectedItem = ref<any>({});
 
+/* 마지막 업데이트 시간 관리 로직 */
+const lastUpdated = ref<Date>(new Date()); // 초기값: 현재 시간
+const timeAgo = ref('방금 전');
+let timer: ReturnType<typeof setInterval> | null = null;
+
+// 시간 문구 업데이트 함수 ("1분 전", "2시간 전" 등)
+const updateTimeLabel = () => {
+  const now = new Date();
+  const diffSeconds = Math.floor((now.getTime() - lastUpdated.value.getTime()) / 1000);
+
+  if (diffSeconds < 60) {
+    timeAgo.value = '방금 전';
+  } else if (diffSeconds < 3600) {
+    timeAgo.value = `${Math.floor(diffSeconds / 60)}분 전`;
+  } else {
+    timeAgo.value = `${Math.floor(diffSeconds / 3600)}시간 전`;
+  }
+};
+
+// 로딩 상태 감지: 로딩이 끝났을 때(true -> false) 시간 갱신
+watch(() => props.loading, (newVal, oldVal) => {
+  if (!newVal && oldVal) {
+    lastUpdated.value = new Date();
+    updateTimeLabel();
+  }
+});
+
+onMounted(() => {
+  // 1분마다 텍스트 갱신 (예: 59초 -> 1분 전)
+  timer = setInterval(updateTimeLabel, 60000);
+});
+
+onUnmounted(() => {
+  if (timer) clearInterval(timer);
+});
+
+
 // 1. 상세 정보 조회 API
 const fetchDetailInfo = async (id: number) => {
-
   try {
     const response = await api(`/schedules/detail?id=${id}`);
-
     if (!response.ok) throw new Error(`Status: ${response.status}`);
-
     const result = await response.json();
     return result.data;
   } catch (error) {
@@ -197,7 +233,6 @@ const handleSaveMemo = async (updatedItem: any) => {
 
     alert("저장되었습니다!");
 
-    // 저장 성공 시, 화면의 리스트에도 즉시 반영 (새로고침 없이)
     const target = props.items.find(i => i.id === updatedItem.id);
     if (target) {
       target.note = updatedItem.note;
@@ -238,13 +273,11 @@ const getDay = (dateStr: string) => {
   return match ? match[1] : '';
 };
 
-/** ?.trim() 및 || '' 추가로 undefined 방지 **/
 const getStartTime = (range: string) => {
   if (!range) return '';
   return range.split(/~|\n/)[0]?.trim() || '';
 };
 
-/**  ?.trim() 및 || '' 추가로 undefined 방지 **/
 const getEndTime = (range: string) => {
   if (!range || !range.includes('~')) return '';
   return range.split('~')[1]?.trim() || '';
@@ -256,7 +289,6 @@ const changeTab = (tabId: string) => {
 };
 
 const startDrag = (e: TouchEvent) => {
-  /** 터치 객체가 있는지 확인 후 접근 **/
   const touch = e.touches[0];
   if (touch) {
     isDragging.value = true;
@@ -267,7 +299,6 @@ const startDrag = (e: TouchEvent) => {
 
 const onDrag = (e: TouchEvent) => {
   if (!isDragging.value) return;
-  /** 터치 객체가 있는지 확인 후 접근 **/
   const touch = e.touches[0];
   if (touch) {
     const currentY = touch.clientY;
@@ -371,7 +402,7 @@ const endDrag = () => {
   background: rgba(248, 249, 250, 0.95);
   padding: 15px 0 10px 0;
 
-  /* 양쪽 정렬 (날짜 - 버튼) */
+  /* 양쪽 정렬 (날짜 - 우측 묶음) */
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -384,6 +415,13 @@ const endDrag = () => {
     display: flex;
     align-items: center;
     gap: 8px;
+  }
+
+  /* 우측 묶음 (시간 텍스트 + 새로고침 버튼) */
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 8px; /* 텍스트와 버튼 사이 간격 */
   }
 
   .day-badge {
@@ -404,7 +442,14 @@ const endDrag = () => {
     color: #222;
   }
 
-  /* 새로고침 버튼 (우측) */
+  /* 마지막 업데이트 텍스트 스타일 */
+  .last-updated {
+    font-size: 0.75rem;
+    color: #868e96;
+    font-weight: 500;
+  }
+
+  /* 새로고침 버튼 */
   .header-refresh-btn {
     background: none;
     border: none;
@@ -443,8 +488,7 @@ const endDrag = () => {
   to { transform: rotate(360deg); }
 }
 
-/* ▲▲▲ [수정 끝] ▲▲▲ */
-
+/* ... (이하 Schedule item 및 Card 스타일 기존 동일) ... */
 .schedule-item-wrapper {
   display: flex;
   gap: 12px;
@@ -461,7 +505,6 @@ const endDrag = () => {
   }
 }
 
-/* 1. 왼쪽 시간 컬럼 */
 .time-col {
   width: 50px;
   flex-shrink: 0;
@@ -489,7 +532,6 @@ const endDrag = () => {
   }
 }
 
-/* 2. 중앙 타임라인 컬럼 */
 .timeline-col {
   width: 16px;
   flex-shrink: 0;
@@ -505,7 +547,6 @@ const endDrag = () => {
     background: #e9ecef;
   }
 
-  /* 동그라미 점 */
   .dot {
     width: 12px;
     height: 12px;
@@ -525,7 +566,6 @@ const endDrag = () => {
   }
 }
 
-/* 3. 오른쪽 정보 카드 */
 .info-card {
   flex: 1;
   background: white;
