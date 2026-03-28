@@ -29,7 +29,7 @@
           :items="items"
           :loading="loading"
           @refresh="$emit('refresh')"
-          @item-click="(item) => $emit('item-click', item)"
+          @item-click="handleItemClick"
       />
 
       <ChecklistTab v-if="currentTab === 'check'" />
@@ -53,7 +53,7 @@ defineProps<{
   loading: boolean;
 }>();
 
-defineEmits(['item-click', 'refresh']);
+const emit = defineEmits(['item-click', 'refresh']);
 
 const tabs = [
   { id: 'schedule', label: '일정' },
@@ -66,6 +66,10 @@ const panelHeight = ref(45);
 const isDragging = ref(false);
 let startY = 0;
 let startHeight = 0;
+
+const handleItemClick = (item: ScheduleItem) => {
+  emit('item-click', item);
+};
 
 const changeTab = (tabId: string) => {
   currentTab.value = tabId;

@@ -82,7 +82,7 @@ const handleLogin = async (response: any) => {
   width: 100%;
   height: 100vh;
   /* 도쿄 타워 야경 이미지 (Unsplash source) */
-  background-image: url('https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?q=80&w=1920&auto=format&fit=crop');
+  background-image: url('../assets/backjp.jpg');
   background-size: cover;
   background-position: center;
   display: flex;

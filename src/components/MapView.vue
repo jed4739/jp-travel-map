@@ -241,38 +241,61 @@ const moveToMyLocation = () => {
   }
 };
 
-// 타입 단언(Assertion)을 사용하여 TS 에러 강제 해결
-const flyToLocation = (lat: number, lng: number) => {
-  if (!map.value) return;
+// 안전한 지도 이동 함수
+const flyToLocation = (lat: number | string, lng: number | string) => {
+  if (!map.value) {
+    console.error("지도가 초기화되지 않았습니다.");
+    return;
+  }
+
+  // 1. 강제 형변환 (문자열 좌표 방지)
+  const nLat = Number(lat);
+  const nLng = Number(lng);
+
+  if (isNaN(nLat) || isNaN(nLng)) {
+    console.error("유효하지 않은 좌표입니다:", lat, lng);
+    return;
+  }
+
   const view = map.value.getView();
   const targetZoom = 16;
-
-  // 변환된 좌표는 무조건 [number, number] 형식이므로 단언
-  const targetLocation = fromLonLat([lng, lat]) as [number, number];
+  const targetLocation = fromLonLat([nLng, nLat]) as [number, number];
 
   const size = map.value.getSize();
   if (!size) return;
 
+  // 2. 패널 높이만큼 중심점 조정 (마커가 화면 중앙보다 살짝 위에 오게)
   const mapHeight = size[1] as number;
-  const pixelOffset = mapHeight * 0.2;
+  const pixelOffset = mapHeight * 0.2; // 화면 높이의 20%만큼 아래로 중심 이동
   const resolution = view.getResolutionForZoom(targetZoom) || 0;
-
   const offsetY = pixelOffset * resolution;
 
-  // newCenter 타입 명시
   const newCenter: [number, number] = [targetLocation[0], targetLocation[1] - offsetY];
 
-  const targetItem = props.scheduleItems.find(i => i.latitude === lat && i.longitude === lng);
+  // 3. 타겟 아이템 찾기 (좌표 오차 범위 허용 or ID 비교 권장)
+  // 소수점 6자리까지만 잘라서 비교하거나, ID가 있다면 ID로 찾는 것이 가장 좋습니다.
+  const targetItem = props.scheduleItems.find(i => {
+    // 만약 item에 id가 있다면: return i.id === itemId; 를 쓰는 게 가장 확실함
+    const itemLat = Number(i.latitude);
+    const itemLng = Number(i.longitude);
+    // 아주 미세한 차이는 같다고 간주 (EPSILON 비교)
+    return Math.abs(itemLat - nLat) < 0.000001 && Math.abs(itemLng - nLng) < 0.000001;
+  });
+
   if (targetItem) {
     selectedItem.value = targetItem;
+    // 팝업 위치 지정 (애니메이션 전에 미리 위치 잡기)
     overlay.value?.setPosition(targetLocation);
+  } else {
+    console.warn("해당 좌표의 스케줄 아이템을 찾지 못해 팝업을 띄우지 못했습니다.");
   }
 
+  // 4. 부드러운 이동 애니메이션
   view.animate({
     center: newCenter,
     zoom: targetZoom,
-    duration: 1000,
-    easing: (t) => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t
+    duration: 1000, // 1초 동안 이동
+    easing: (t) => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t // Ease In Out 효과
   });
 };
 

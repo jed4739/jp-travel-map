@@ -34,7 +34,7 @@ onMounted(() => {
 // 리스트 클릭 -> 지도 이동
 const handleListClick = (item: ScheduleItem) => {
   if (!item.latitude || !item.longitude) return;
-  // MapView가 노출(expose)한 flyToLocation 함수 실행
+
   mapViewRef.value?.flyToLocation(item.latitude, item.longitude);
 };
 
